@@ -41,3 +41,11 @@ func (v Value) String() string {
 		return "error, unexpected type"
 	}
 }
+
+func (v *Value) SetType(data_type rune) {
+	v.data_type = data_type
+}
+
+func (v *Value) SetString(text string) {
+	v.str = text
+}

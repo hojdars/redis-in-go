@@ -38,8 +38,12 @@ func main() {
 		}
 		log.Printf("received msg: %s\n", value.String())
 
-		// ignore request and send back a PONG
-		conn.Write([]byte("+OK\r\n"))
+		// ignore request and send back a PONG (OK)
+		writer := resp.NewWriter(conn)
+		return_value := resp.Value{}
+		return_value.SetType(resp.STRING)
+		return_value.SetString("OK")
+		writer.Write(return_value)
 	}
 
 	log.Println("connection terminated")
