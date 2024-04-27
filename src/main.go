@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"redis-server/handler"
+	"redis-server/persistence"
 	"redis-server/resp"
 	"strings"
 )
@@ -13,18 +14,38 @@ import (
 func main() {
 	l, err := net.Listen("tcp", ":6379")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("fatal error starting TCP at port 6379, error=%s", err)
 		return
 	}
 	log.Println("listening on tcp, port=6379")
 
-	conn, err := l.Accept()
+	aof, err := persistence.NewAof("database.aof")
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("fatal error initiating AoF, error=%s", err)
 		return
 	}
-	defer conn.Close() // close connection once finished
-	log.Println("accepted a connection")
+	defer aof.Close()
+
+	aof.Read(func(value resp.Value) {
+		command_array := value.GetArray()
+		command := strings.ToUpper(command_array[0].GetBulk())
+		arguments := command_array[1:]
+
+		handler, ok := handler.Handlers[command]
+		if !ok {
+			return
+		}
+
+		handler(arguments)
+	})
+
+	conn, err := l.Accept()
+	if err != nil {
+		log.Fatalf("accepting a connection, error=%s", err)
+		return
+	}
+	defer conn.Close()
+	log.Printf("accepted a connection from %s\n", conn.RemoteAddr())
 
 	for {
 		received := resp.NewResp(conn)
@@ -59,6 +80,11 @@ func main() {
 			writer.Write(resp.NewErrorValue("invalid command"))
 			continue
 		}
+
+		if command == "SET" || command == "HSET" {
+			aof.Write(value)
+		}
+
 		result_value := handler(command_array[1:])
 		writer.Write(result_value)
 	}

@@ -2,8 +2,9 @@ package handler
 
 import (
 	"fmt"
-	"redis-server/resp"
 	"sync"
+
+	"redis-server/resp"
 )
 
 var SETs = map[string]string{}
