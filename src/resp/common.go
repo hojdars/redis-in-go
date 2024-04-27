@@ -1,6 +1,9 @@
 package resp
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 const (
 	STRING  = '+'
@@ -60,6 +63,18 @@ func NewBulkValue(text string) (result Value) {
 	return
 }
 
+func NewIntegerValue(val int) (result Value) {
+	result.data_type = INTEGER
+	result.num = val
+	return
+}
+
+func NewArrayValue() (result Value) {
+	result.data_type = ARRAY
+	result.array = make([]Value, 0)
+	return
+}
+
 func (v Value) GetType() rune {
 	return v.data_type
 }
@@ -78,4 +93,12 @@ func (v Value) GetBulk() string {
 	} else {
 		return ""
 	}
+}
+
+func (v *Value) AppendToArray(val Value) error {
+	if v.data_type != ARRAY {
+		return errors.New("value is not an array")
+	}
+	v.array = append(v.array, val)
+	return nil
 }
