@@ -5,9 +5,10 @@ import (
 	"io"
 	"log"
 	"os"
-	"redis-server/resp"
 	"sync"
 	"time"
+
+	"redis-server/resp"
 )
 
 type Aof struct {

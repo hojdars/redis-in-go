@@ -5,26 +5,18 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
+
 	"redis-server/handler"
 	"redis-server/persistence"
 	"redis-server/resp"
-	"strings"
 )
 
-func main() {
-	l, err := net.Listen("tcp", ":6379")
+func start_aof() (*persistence.Aof, error) {
+	aof, err := persistence.NewAof("../data/database.aof")
 	if err != nil {
-		log.Fatalf("fatal error starting TCP at port 6379, error=%s", err)
-		return
+		return nil, err
 	}
-	log.Println("listening on tcp, port=6379")
-
-	aof, err := persistence.NewAof("database.aof")
-	if err != nil {
-		log.Fatalf("fatal error initiating AoF, error=%s", err)
-		return
-	}
-	defer aof.Close()
 
 	aof.Read(func(value resp.Value) {
 		command_array := value.GetArray()
@@ -39,13 +31,12 @@ func main() {
 		handler(arguments)
 	})
 
-	conn, err := l.Accept()
-	if err != nil {
-		log.Fatalf("accepting a connection, error=%s", err)
-		return
-	}
+	return aof, nil
+}
+
+func handle_connection(conn net.Conn, aof *persistence.Aof) {
 	defer conn.Close()
-	log.Printf("accepted a connection from %s\n", conn.RemoteAddr())
+	log.Printf("Accepted a connection from %s\n", conn.RemoteAddr())
 
 	for {
 		received := resp.NewResp(conn)
@@ -57,8 +48,6 @@ func main() {
 			}
 			break
 		}
-
-		log.Printf("received command, resp=%s", value.String())
 
 		if value.GetType() != resp.ARRAY {
 			log.Fatalf("Invalid request, received type=%v, expected array\n", value.GetType())
@@ -87,7 +76,36 @@ func main() {
 
 		result_value := handler(command_array[1:])
 		writer.Write(result_value)
-	}
 
-	log.Println("connection terminated")
+	}
+	log.Printf("Connection to %s terminated\n", conn.RemoteAddr())
+}
+
+func main() {
+	// start the AoF and load the file
+	aof, err := start_aof()
+	if err != nil {
+		log.Fatalf("Fatal error initiating AoF, error=%s", err)
+		return
+	}
+	defer aof.Close()
+
+	// listen on the redis port 6379
+	tcp_listener, err := net.Listen("tcp", ":6379")
+	if err != nil {
+		log.Fatalf("Fatal error starting TCP at port 6379, error=%s", err)
+		return
+	}
+	log.Println("Listening on tcp, port=6379")
+
+	// in a loop, accept any incoming connections and start a goroutine to handle them
+	for {
+		conn, err := tcp_listener.Accept()
+		if err != nil {
+			log.Fatalf("Accepting a connection, error=%s", err)
+			return
+		}
+
+		go handle_connection(conn, aof)
+	}
 }
