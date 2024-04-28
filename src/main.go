@@ -12,7 +12,7 @@ import (
 	"redis-server/resp"
 )
 
-func start_aof() (*persistence.Aof, error) {
+func start_aof(in_memory_db *handler.InMemoryData) (*persistence.Aof, error) {
 	aof, err := persistence.NewAof("../data/database.aof")
 	if err != nil {
 		return nil, err
@@ -23,18 +23,16 @@ func start_aof() (*persistence.Aof, error) {
 		command := strings.ToUpper(command_array[0].GetBulk())
 		arguments := command_array[1:]
 
-		handler, ok := handler.Handlers[command]
-		if !ok {
+		_, err := in_memory_db.Handle(command, arguments)
+		if err != nil {
 			return
 		}
-
-		handler(arguments)
 	})
 
 	return aof, nil
 }
 
-func handle_connection(conn net.Conn, aof *persistence.Aof) {
+func handle_connection(conn net.Conn, in_memory_db *handler.InMemoryData, aof *persistence.Aof) {
 	defer conn.Close()
 	log.Printf("Accepted a connection from %s\n", conn.RemoteAddr())
 
@@ -63,27 +61,27 @@ func handle_connection(conn net.Conn, aof *persistence.Aof) {
 		command := strings.ToUpper(command_array[0].GetBulk())
 		writer := resp.NewWriter(conn)
 
-		handler, ok := handler.Handlers[command]
-		if !ok {
-			log.Fatalf("Invalid command, command=%v\n", command)
-			writer.Write(resp.NewErrorValue("invalid command"))
+		result_value, err := in_memory_db.Handle(command, command_array[1:])
+		if err != nil {
+			log.Fatalf("Command error, error=%v\n", err)
+			writer.Write(resp.NewErrorValue(fmt.Sprintf("%s", err)))
 			continue
 		}
+		writer.Write(result_value)
 
 		if command == "SET" || command == "HSET" {
 			aof.Write(value)
 		}
-
-		result_value := handler(command_array[1:])
-		writer.Write(result_value)
-
 	}
 	log.Printf("Connection to %s terminated\n", conn.RemoteAddr())
 }
 
 func main() {
+	// create the in-memory database
+	in_memory_db := handler.NewInMemoryData()
+
 	// start the AoF and load the file
-	aof, err := start_aof()
+	aof, err := start_aof(in_memory_db)
 	if err != nil {
 		log.Fatalf("Fatal error initiating AoF, error=%s", err)
 		return
@@ -106,6 +104,6 @@ func main() {
 			return
 		}
 
-		go handle_connection(conn, aof)
+		go handle_connection(conn, in_memory_db, aof)
 	}
 }

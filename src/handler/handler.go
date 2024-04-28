@@ -7,23 +7,45 @@ import (
 	"redis-server/resp"
 )
 
-var SETs = map[string]string{}
-var SETsLock = sync.RWMutex{}
-
-var HSETs = map[string]map[string]string{}
-var HSETsLock = sync.RWMutex{}
-
-var Handlers = map[string]func([]resp.Value) resp.Value{
-	"PING":    ping,
-	"COMMAND": command,
-	"SET":     set,
-	"GET":     get,
-	"HSET":    hset,
-	"HGET":    hget,
-	"HGETALL": hgetall,
+type InMemoryData struct {
+	sets       map[string]string
+	sets_lock  sync.RWMutex
+	hsets      map[string]map[string]string
+	hsets_lock sync.RWMutex
+	handlers   map[string]func([]resp.Value) resp.Value
 }
 
-func ping(args []resp.Value) resp.Value {
+func NewInMemoryData() *InMemoryData {
+	result := &InMemoryData{}
+
+	result.sets = make(map[string]string)
+	result.hsets = make(map[string]map[string]string)
+
+	result.sets_lock = sync.RWMutex{}
+	result.hsets_lock = sync.RWMutex{}
+
+	result.handlers = map[string]func([]resp.Value) resp.Value{
+		"PING":    result.ping,
+		"COMMAND": result.command,
+		"SET":     result.set,
+		"GET":     result.get,
+		"HSET":    result.hset,
+		"HGET":    result.hget,
+		"HGETALL": result.hgetall,
+	}
+
+	return result
+}
+
+func (mem *InMemoryData) Handle(command string, args []resp.Value) (resp.Value, error) {
+	handler, ok := mem.handlers[command]
+	if !ok {
+		return resp.Value{}, fmt.Errorf("invalid command, command=%s", command)
+	}
+	return handler(args), nil
+}
+
+func (mem *InMemoryData) ping(args []resp.Value) resp.Value {
 	if len(args) == 0 {
 		return resp.NewStringValue("PONG")
 	} else {
@@ -31,11 +53,11 @@ func ping(args []resp.Value) resp.Value {
 	}
 }
 
-func command([]resp.Value) resp.Value {
+func (mem *InMemoryData) command([]resp.Value) resp.Value {
 	return resp.NewStringValue("OK")
 }
 
-func set(args []resp.Value) resp.Value {
+func (mem *InMemoryData) set(args []resp.Value) resp.Value {
 	if len(args) != 2 {
 		return resp.NewErrorValue(fmt.Sprintf("ERR wrong number of arguments for 'SET' command, got %d", len(args)))
 	}
@@ -43,24 +65,24 @@ func set(args []resp.Value) resp.Value {
 	key := args[0].GetBulk()
 	value := args[1].GetBulk()
 
-	SETsLock.Lock()
-	defer SETsLock.Unlock()
+	mem.sets_lock.Lock()
+	defer mem.sets_lock.Unlock()
 
-	SETs[key] = value
+	mem.sets[key] = value
 	return resp.NewStringValue("OK")
 }
 
-func get(args []resp.Value) resp.Value {
+func (mem *InMemoryData) get(args []resp.Value) resp.Value {
 	if len(args) != 1 {
 		return resp.NewErrorValue(fmt.Sprintf("ERR wrong number of arguments for 'GET' command, got %d", len(args)))
 	}
 
 	key := args[0].GetBulk()
 
-	SETsLock.RLock()
-	defer SETsLock.RUnlock()
+	mem.sets_lock.RLock()
+	defer mem.sets_lock.RUnlock()
 
-	value, ok := SETs[key]
+	value, ok := mem.sets[key]
 
 	if !ok {
 		return resp.NewStringValue("null")
@@ -69,27 +91,27 @@ func get(args []resp.Value) resp.Value {
 	}
 }
 
-func hset(args []resp.Value) resp.Value {
+func (mem *InMemoryData) hset(args []resp.Value) resp.Value {
 	if len(args) < 3 || len(args)%2 != 1 {
 		return resp.NewErrorValue(fmt.Sprintf("ERR wrong number of arguments for 'HSET' command, got %d", len(args)))
 	}
 
 	set := args[0].GetBulk()
 
-	HSETsLock.Lock()
-	defer HSETsLock.Unlock()
+	mem.hsets_lock.Lock()
+	defer mem.hsets_lock.Unlock()
 
 	number_fields_added := 0
 	for i := 1; i < len(args); i += 2 {
 		key := args[i].GetBulk()
 		value := args[i+1].GetBulk()
 
-		_, ok := HSETs[set]
+		_, ok := mem.hsets[set]
 		if !ok {
-			HSETs[set] = make(map[string]string)
+			mem.hsets[set] = make(map[string]string)
 		}
 
-		hash_set := HSETs[set]
+		hash_set := mem.hsets[set]
 		_, exists := hash_set[key]
 		if !exists {
 			number_fields_added++
@@ -100,7 +122,7 @@ func hset(args []resp.Value) resp.Value {
 	return resp.NewIntegerValue(number_fields_added)
 }
 
-func hget(args []resp.Value) resp.Value {
+func (mem *InMemoryData) hget(args []resp.Value) resp.Value {
 	if len(args) != 2 {
 		return resp.NewErrorValue(fmt.Sprintf("ERR wrong number of arguments for 'HGET' command, got %d", len(args)))
 	}
@@ -108,10 +130,10 @@ func hget(args []resp.Value) resp.Value {
 	key := args[0].GetBulk()
 	field := args[1].GetBulk()
 
-	HSETsLock.RLock()
-	defer HSETsLock.RUnlock()
+	mem.hsets_lock.RLock()
+	defer mem.hsets_lock.RUnlock()
 
-	value, ok := HSETs[key][field]
+	value, ok := mem.hsets[key][field]
 
 	if !ok {
 		return resp.NewStringValue("null")
@@ -120,17 +142,17 @@ func hget(args []resp.Value) resp.Value {
 	}
 }
 
-func hgetall(args []resp.Value) resp.Value {
+func (mem *InMemoryData) hgetall(args []resp.Value) resp.Value {
 	if len(args) != 1 {
 		return resp.NewErrorValue(fmt.Sprintf("ERR wrong number of arguments for 'HGETALL' command, got %d", len(args)))
 	}
 
 	key := args[0].GetBulk()
 
-	HSETsLock.RLock()
-	defer HSETsLock.RUnlock()
+	mem.hsets_lock.RLock()
+	defer mem.hsets_lock.RUnlock()
 
-	value, ok := HSETs[key]
+	value, ok := mem.hsets[key]
 
 	if !ok {
 		return resp.NewStringValue("null")
