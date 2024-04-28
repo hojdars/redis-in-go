@@ -12,10 +12,10 @@ import (
 )
 
 type Aof struct {
-	file     *os.File
-	rd       *bufio.Reader
-	mu       sync.Mutex
-	new_flag bool
+	file          *os.File
+	rd            *bufio.Reader
+	mu            sync.Mutex
+	isNewDataFlag bool
 }
 
 func NewAof(path string) (*Aof, error) {
@@ -29,9 +29,9 @@ func NewAof(path string) (*Aof, error) {
 	go func() {
 		for {
 			aof.mu.Lock()
-			if aof.new_flag {
+			if aof.isNewDataFlag {
 				aof.file.Sync()
-				aof.new_flag = false
+				aof.isNewDataFlag = false
 				log.Println("AoF: saved new data")
 			}
 			aof.mu.Unlock()
@@ -52,7 +52,7 @@ func (aof *Aof) Write(value resp.Value) error {
 	aof.mu.Lock()
 	defer aof.mu.Unlock()
 
-	aof.new_flag = true
+	aof.isNewDataFlag = true
 	_, err := aof.file.Write(value.Serialize())
 	if err != nil {
 		return err

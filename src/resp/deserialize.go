@@ -18,12 +18,12 @@ func NewResp(rd io.Reader) *Resp {
 }
 
 func (r *Resp) Read() (value Value, err error) {
-	data_type, err := r.reader.ReadByte()
+	dataType, err := r.reader.ReadByte()
 	if err != nil {
 		return Value{}, err
 	}
 
-	switch data_type {
+	switch dataType {
 	case STRING:
 		log.Println("not implemented yet")
 		return Value{}, nil
@@ -38,7 +38,7 @@ func (r *Resp) Read() (value Value, err error) {
 	case ARRAY:
 		return r.readArray()
 	default:
-		log.Printf("received unknown type: %v", string(data_type))
+		log.Printf("received unknown type: %v", string(dataType))
 		return Value{}, nil
 	}
 }
@@ -81,7 +81,7 @@ func (r *Resp) readInteger() (x int, n int, err error) {
 
 func (r *Resp) readArray() (Value, error) {
 	result := Value{}
-	result.data_type = ARRAY
+	result.dataType = ARRAY
 
 	len, _, err := r.readInteger()
 	if err != nil {
@@ -101,7 +101,7 @@ func (r *Resp) readArray() (Value, error) {
 
 func (r *Resp) readBulk() (Value, error) {
 	result := Value{}
-	result.data_type = BULK
+	result.dataType = BULK
 
 	len, _, err := r.readInteger()
 	if err != nil {

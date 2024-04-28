@@ -14,15 +14,15 @@ const (
 )
 
 type Value struct {
-	data_type rune
-	str       string
-	num       int
-	bulk      string
-	array     []Value
+	dataType rune
+	str      string
+	num      int
+	bulk     string
+	array    []Value
 }
 
 func (v Value) String() string {
-	switch v.data_type {
+	switch v.dataType {
 	case STRING:
 		return fmt.Sprintf("+'%s", v.str)
 	case ERROR:
@@ -46,41 +46,41 @@ func (v Value) String() string {
 }
 
 func NewStringValue(text string) (result Value) {
-	result.data_type = STRING
+	result.dataType = STRING
 	result.str = text
 	return
 }
 
 func NewErrorValue(text string) (result Value) {
-	result.data_type = ERROR
+	result.dataType = ERROR
 	result.str = text
 	return
 }
 
 func NewBulkValue(text string) (result Value) {
-	result.data_type = BULK
+	result.dataType = BULK
 	result.bulk = text
 	return
 }
 
 func NewIntegerValue(val int) (result Value) {
-	result.data_type = INTEGER
+	result.dataType = INTEGER
 	result.num = val
 	return
 }
 
 func NewArrayValue() (result Value) {
-	result.data_type = ARRAY
+	result.dataType = ARRAY
 	result.array = make([]Value, 0)
 	return
 }
 
 func (v Value) GetType() rune {
-	return v.data_type
+	return v.dataType
 }
 
 func (v Value) GetArray() []Value {
-	if v.data_type == ARRAY {
+	if v.dataType == ARRAY {
 		return v.array
 	} else {
 		return []Value{}
@@ -88,7 +88,7 @@ func (v Value) GetArray() []Value {
 }
 
 func (v Value) GetBulk() string {
-	if v.data_type == BULK {
+	if v.dataType == BULK {
 		return v.bulk
 	} else {
 		return ""
@@ -96,7 +96,7 @@ func (v Value) GetBulk() string {
 }
 
 func (v *Value) AppendToArray(val Value) error {
-	if v.data_type != ARRAY {
+	if v.dataType != ARRAY {
 		return errors.New("value is not an array")
 	}
 	v.array = append(v.array, val)

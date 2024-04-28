@@ -24,7 +24,7 @@ func (w *Writer) Write(v Value) error {
 }
 
 func (v Value) Serialize() []byte {
-	switch v.data_type {
+	switch v.dataType {
 	case STRING:
 		return v.serializeString()
 	case ERROR:
@@ -41,7 +41,7 @@ func (v Value) Serialize() []byte {
 }
 
 func (v Value) serializeString() []byte {
-	if v.data_type != STRING {
+	if v.dataType != STRING {
 		return []byte{}
 	}
 
@@ -53,7 +53,7 @@ func (v Value) serializeString() []byte {
 }
 
 func (v Value) serializeError() []byte {
-	if v.data_type != ERROR {
+	if v.dataType != ERROR {
 		return []byte{}
 	}
 
@@ -66,7 +66,7 @@ func (v Value) serializeError() []byte {
 }
 
 func (v Value) serializeInteger() []byte {
-	if v.data_type != INTEGER {
+	if v.dataType != INTEGER {
 		return []byte{}
 	}
 
@@ -78,7 +78,7 @@ func (v Value) serializeInteger() []byte {
 }
 
 func (v Value) serializeBulk() []byte {
-	if v.data_type != BULK {
+	if v.dataType != BULK {
 		return []byte{}
 	}
 
@@ -92,7 +92,7 @@ func (v Value) serializeBulk() []byte {
 }
 
 func (v Value) serializeArray() []byte {
-	if v.data_type != ARRAY {
+	if v.dataType != ARRAY {
 		return []byte{}
 	}
 

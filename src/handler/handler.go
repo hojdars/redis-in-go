@@ -8,11 +8,11 @@ import (
 )
 
 type InMemoryData struct {
-	sets       map[string]string
-	sets_lock  sync.RWMutex
-	hsets      map[string]map[string]string
-	hsets_lock sync.RWMutex
-	handlers   map[string]func([]resp.Value) resp.Value
+	sets      map[string]string
+	setsLock  sync.RWMutex
+	hsets     map[string]map[string]string
+	hsetsLock sync.RWMutex
+	handlers  map[string]func([]resp.Value) resp.Value
 }
 
 func NewInMemoryData() *InMemoryData {
@@ -21,8 +21,8 @@ func NewInMemoryData() *InMemoryData {
 	result.sets = make(map[string]string)
 	result.hsets = make(map[string]map[string]string)
 
-	result.sets_lock = sync.RWMutex{}
-	result.hsets_lock = sync.RWMutex{}
+	result.setsLock = sync.RWMutex{}
+	result.hsetsLock = sync.RWMutex{}
 
 	result.handlers = map[string]func([]resp.Value) resp.Value{
 		"PING":    result.ping,
@@ -65,8 +65,8 @@ func (mem *InMemoryData) set(args []resp.Value) resp.Value {
 	key := args[0].GetBulk()
 	value := args[1].GetBulk()
 
-	mem.sets_lock.Lock()
-	defer mem.sets_lock.Unlock()
+	mem.setsLock.Lock()
+	defer mem.setsLock.Unlock()
 
 	mem.sets[key] = value
 	return resp.NewStringValue("OK")
@@ -79,8 +79,8 @@ func (mem *InMemoryData) get(args []resp.Value) resp.Value {
 
 	key := args[0].GetBulk()
 
-	mem.sets_lock.RLock()
-	defer mem.sets_lock.RUnlock()
+	mem.setsLock.RLock()
+	defer mem.setsLock.RUnlock()
 
 	value, ok := mem.sets[key]
 
@@ -98,10 +98,10 @@ func (mem *InMemoryData) hset(args []resp.Value) resp.Value {
 
 	set := args[0].GetBulk()
 
-	mem.hsets_lock.Lock()
-	defer mem.hsets_lock.Unlock()
+	mem.hsetsLock.Lock()
+	defer mem.hsetsLock.Unlock()
 
-	number_fields_added := 0
+	numberOfFieldsAdded := 0
 	for i := 1; i < len(args); i += 2 {
 		key := args[i].GetBulk()
 		value := args[i+1].GetBulk()
@@ -111,15 +111,15 @@ func (mem *InMemoryData) hset(args []resp.Value) resp.Value {
 			mem.hsets[set] = make(map[string]string)
 		}
 
-		hash_set := mem.hsets[set]
-		_, exists := hash_set[key]
+		hashSet := mem.hsets[set]
+		_, exists := hashSet[key]
 		if !exists {
-			number_fields_added++
+			numberOfFieldsAdded++
 		}
-		hash_set[key] = value
+		hashSet[key] = value
 	}
 
-	return resp.NewIntegerValue(number_fields_added)
+	return resp.NewIntegerValue(numberOfFieldsAdded)
 }
 
 func (mem *InMemoryData) hget(args []resp.Value) resp.Value {
@@ -130,8 +130,8 @@ func (mem *InMemoryData) hget(args []resp.Value) resp.Value {
 	key := args[0].GetBulk()
 	field := args[1].GetBulk()
 
-	mem.hsets_lock.RLock()
-	defer mem.hsets_lock.RUnlock()
+	mem.hsetsLock.RLock()
+	defer mem.hsetsLock.RUnlock()
 
 	value, ok := mem.hsets[key][field]
 
@@ -149,8 +149,8 @@ func (mem *InMemoryData) hgetall(args []resp.Value) resp.Value {
 
 	key := args[0].GetBulk()
 
-	mem.hsets_lock.RLock()
-	defer mem.hsets_lock.RUnlock()
+	mem.hsetsLock.RLock()
+	defer mem.hsetsLock.RUnlock()
 
 	value, ok := mem.hsets[key]
 
@@ -158,10 +158,10 @@ func (mem *InMemoryData) hgetall(args []resp.Value) resp.Value {
 		return resp.NewStringValue("null")
 	}
 
-	return_value := resp.NewArrayValue()
+	returnValue := resp.NewArrayValue()
 	for k, v := range value {
-		return_value.AppendToArray(resp.NewBulkValue(k))
-		return_value.AppendToArray(resp.NewBulkValue(v))
+		returnValue.AppendToArray(resp.NewBulkValue(k))
+		returnValue.AppendToArray(resp.NewBulkValue(v))
 	}
-	return return_value
+	return returnValue
 }
