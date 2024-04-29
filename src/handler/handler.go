@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"redis-server/resp"
@@ -12,7 +13,9 @@ type InMemoryData struct {
 	setsLock  sync.RWMutex
 	hsets     map[string]map[string]string
 	hsetsLock sync.RWMutex
-	handlers  map[string]func([]resp.Value) resp.Value
+
+	handlers   map[string]func([]resp.Value) resp.Value
+	setOptions map[string]uint // 'uint' indicates how many additional arguments this option has
 }
 
 func NewInMemoryData() *InMemoryData {
@@ -32,6 +35,12 @@ func NewInMemoryData() *InMemoryData {
 		"HSET":    result.hset,
 		"HGET":    result.hget,
 		"HGETALL": result.hgetall,
+	}
+
+	result.setOptions = map[string]uint{
+		"NX":  0,
+		"XX":  0,
+		"GET": 0,
 	}
 
 	return result
@@ -58,18 +67,47 @@ func (mem *InMemoryData) command([]resp.Value) resp.Value {
 }
 
 func (mem *InMemoryData) set(args []resp.Value) resp.Value {
-	if len(args) != 2 {
-		return resp.NewErrorValue(fmt.Sprintf("ERR wrong number of arguments for 'SET' command, got %d", len(args)))
+	if len(args) < 2 {
+		return resp.NewErrorValue(fmt.Sprintf("error, too few arguments for 'SET' command, got %d", len(args)))
 	}
 
 	key := args[0].GetBulk()
 	value := args[1].GetBulk()
 
+	isNxSet := false
+	isXxSet := false
+	isGetSet := false
+	for i := 2; i < len(args); i++ {
+		arg := strings.ToUpper(args[i].GetBulk())
+		i += int(mem.setOptions[arg])
+		switch arg {
+		case "NX":
+			isNxSet = true
+		case "XX":
+			isXxSet = true
+		case "GET":
+			isGetSet = true
+		}
+	}
+
 	mem.setsLock.Lock()
 	defer mem.setsLock.Unlock()
 
-	mem.sets[key] = value
-	return resp.NewStringValue("OK")
+	returnValue := "OK"
+	if isGetSet {
+		returnValue = mem.sets[key]
+	}
+
+	if isNxSet || isXxSet {
+		_, exists := mem.sets[key]
+		if (isXxSet && exists) || (isNxSet && !exists) {
+			mem.sets[key] = value
+		}
+	} else {
+		mem.sets[key] = value
+	}
+
+	return resp.NewStringValue(returnValue)
 }
 
 func (mem *InMemoryData) get(args []resp.Value) resp.Value {
