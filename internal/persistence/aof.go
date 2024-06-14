@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"redis-server/resp"
+	"github.com/hojdars/redis-in-go/internal/resp"
 )
 
 type Aof struct {

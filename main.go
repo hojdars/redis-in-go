@@ -7,13 +7,13 @@ import (
 	"net"
 	"strings"
 
-	"redis-server/handler"
-	"redis-server/persistence"
-	"redis-server/resp"
+	"github.com/hojdars/redis-in-go/internal/handler"
+	"github.com/hojdars/redis-in-go/internal/persistence"
+	"github.com/hojdars/redis-in-go/internal/resp"
 )
 
 func startAof(inMemoryDb *handler.InMemoryData) (*persistence.Aof, error) {
-	aof, err := persistence.NewAof("../data/database.aof")
+	aof, err := persistence.NewAof("../testdata/database.aof")
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"redis-server/resp"
+	"github.com/hojdars/redis-in-go/internal/resp"
 )
 
 type InMemoryData struct {
