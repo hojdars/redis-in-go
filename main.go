@@ -13,7 +13,7 @@ import (
 )
 
 func startAof(inMemoryDb *handler.InMemoryData) (*persistence.Aof, error) {
-	aof, err := persistence.NewAof("../testdata/database.aof")
+	aof, err := persistence.NewAof("testdata/database.aof")
 	if err != nil {
 		return nil, err
 	}
